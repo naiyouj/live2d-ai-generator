@@ -1,11 +1,18 @@
 # -*- coding: utf-8 -*-
-"""贴图内容 UV 范围 vs moc3 网格 UV 范围对照；放大用户截图的方块区域。"""
+"""贴图内容 UV 范围 vs moc3 网格 UV 范围对照；排查某块贴图为什么花掉。
+
+用法：
+    python tools\\tex_uv_check.py [preview/textures 目录]
+不传参数时用脚本里默认的任务目录（按需改 NAMES / MESH_UV）。
+"""
+import sys
 from pathlib import Path
 
 from PIL import Image
 
 ROOT = Path(__file__).resolve().parent.parent
-TEX = ROOT / "workspace/20260916-215808-f3b407/preview/textures"
+TEX = Path(sys.argv[1]) if len(sys.argv) > 1 \
+    else ROOT / "workspace/20260916-215808-f3b407/preview/textures"
 
 NAMES = [
     "003_tex_02_face_base",
@@ -35,15 +42,6 @@ def main() -> None:
         print(f"  {name}: content uv x[{u[0]:.3f},{u[2]:.3f}] y[{u[1]:.3f},{u[3]:.3f}]")
     for k, v in MESH_UV.items():
         print(f"  mesh {k:14s}: uv x[{v[0]:.3f},{v[2]:.3f}] y[{v[1]:.3f},{v[3]:.3f}]")
-
-    src = Path(r"C:\Users\Administrator\.zcode\cli\image-cache"
-               r"\sess_9fce5468-8521-4dcf-b7fe-013aa7fec9bc"
-               r"\image-4177e265f4a46824c8861341aa229085.png")
-    if src.exists():
-        im = Image.open(src)
-        print("user img size:", im.size)
-        im.crop((110, 60, 230, 180)).resize(
-            (480, 480), Image.NEAREST).save(r"C:\Users\Administrator\AppData\Local\Temp\user_square_zoom.png")
 
 
 if __name__ == "__main__":

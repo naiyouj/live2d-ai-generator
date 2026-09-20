@@ -1,5 +1,7 @@
 # Live2D AI 生成器 v2
 
+[English](README.en.md) | 简体中文
+
 把 **AI 生图 → 一张图 → 可动 Live2D 模型** 的完整流程做成本地 Web 应用，全部在本机运行。
 
 ```
@@ -84,6 +86,9 @@ python -m venv .venv
    - 在线/本地 API：OpenAI 兼容端点（`https://xxx/v1`）+ Key + 模型名
    - ComfyUI：地址 + workflow 的 API format JSON（自动替换提示词与 seed）
    - **上传本地图片**：最简单，跳过生图环节
+
+   配置存 `data/config.json`（密钥存 `data/secrets.json`），两者都不进
+   git；想省事可以复制 `data/config.example.json` 改名后再在网页里微调。
 
 两个外部工具仓库**不进 git**（体积大 + 尊重上游），由 `下载外部工具.bat`
 按 `patches/*/HEAD.txt` 记录的提交号自动拉取并套补丁：
@@ -203,17 +208,19 @@ patches/         外部工具的本地补丁快照（整文件覆盖层 + change
 tools/           fetch_tools / download_models / make_backup 等自有脚本 +
                  两个外部仓库（git 忽略，bat 自动拉取）
 workspace/       任务产物，每个任务一个目录，按 stage 分子目录（git 忽略）
-data/            config.json（入库）+ secrets.json（API Key，git 忽略）
+data/            config.json（本机配置，git 忽略）+ secrets.json（API Key，
+                 git 忽略）+ config.example.json（入库的配置模板）
 ```
 
 ### git 仓库里有什么、没什么
 
 - **在仓库里**：全部自有代码（`server/`、`tools/*.py`、根目录 py + bat）、
-  `patches/` 补丁快照、`data/config.json`。
+  `patches/` 补丁快照、`data/config.example.json` 配置模板。
 - **不在仓库里**（自动重建/下载）：`.venv`（安装环境.bat）、
   `tools/see-through`、`tools/image2live2d`（下载外部工具.bat）、
   `server/web/vendor`（下载外部工具.bat 或环境自检按钮）、`workspace/`
-  （任务产物）、`logs/`、`data/secrets.json`（**API Key，永远不进 git**）。
+  （任务产物）、`logs/`、`data/config.json`（本机配置）、
+  `data/secrets.json`（**API Key，永远不进 git**）。
 
 ## API
 
@@ -247,5 +254,9 @@ data/            config.json（入库）+ secrets.json（API Key，git 忽略）
   `下载外部工具.bat` 自动套上。**更新该仓库要重新导出补丁**（在
   `Live2DEmitter(...)` 处补 `moc_writer=native_moc_writer` 并 import
   `from .backends.live2d.moc3_emit import native_moc_writer`）。
-- API Key 明文存在 `data/secrets.json`，打包/分享项目时用
+- API Key 明文存在 `data/secrets.json`（git 忽略），打包/分享项目时用
   `备份打包.bat`（自动排除），别手动 zip 全目录。
+- [see-through](https://github.com/shitagaki-lab/see-through) 与
+  [image2live2d](https://github.com/Wzhang3912/image2live2d) 均为
+  Apache-2.0 开源项目；`patches/` 里的覆盖层快照仅为本项目所需的
+  最小改动集，版权归各自上游作者，改动内容另见同目录 `changes.diff`。

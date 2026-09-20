@@ -14,8 +14,9 @@ tools/image2live2d/
 # 网页预览依赖（下载外部工具.bat 或环境自检按钮下载）
 server/web/vendor/
 
-# 密钥 —— 绝对不能入库
+# 密钥与本机配置 —— 绝对不能入库（模板见 data/config.example.json）
 data/secrets.json
+data/config.json
 
 # 备份与临时文件
 *.zip
