@@ -1,0 +1,24 @@
+# Web 控制台本体依赖。双击 启动.bat 会自动装这些（venv 里已装好）。
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.6
+httpx>=0.26
+python-multipart>=0.0.9
+pillow>=10.0
+
+# 图层预览导出（缺了只是看不到分层预览）
+psd-tools>=1.9
+
+# ---------------------------------------------------------------
+# 下面这些跑「安装环境.bat」时会装，不用手动处理：
+#   torch==2.8.0+cu126  torchvision==0.23.0+cu126   （按驱动自动选 CUDA 版）
+#   numpy pillow tqdm einops packaging matplotlib safetensors
+#   accelerate huggingface-hub transformers diffusers opencv-python scipy
+#   scikit-image omegaconf pyyaml kornia
+#   bitsandbytes   （8GB 显存走 NF4 量化时才需要）
+#   rembg[cpu]     （步骤2「去背景」需要）
+#   triangle       （image2live2d 网格三角化）
+#
+# 版本注意：diffusers/transformers/accelerate 必须 tools/see-through 的
+# requirements.txt 说了算（当前 0.37.0 / 5.0.0 / 1.13.0），装新会崩。
+# ---------------------------------------------------------------

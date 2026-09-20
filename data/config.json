@@ -1,0 +1,8 @@
+{
+  "gen_mode": "api",
+  "api_base": "https://nexaxis.ai/v1",
+  "api_model": "gpt-image-2-c",
+  "decomp_precision": "nf4",
+  "decomp_resolution": 768,
+  "decomp_group_offload": true
+}

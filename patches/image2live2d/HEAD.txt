@@ -1,0 +1,2 @@
+714e7cc9191f1ef6c9a1732c80e8b566ec127d6b
+# image2live2d 补丁对应的仓库提交号（fetch_tools.py 按此提交号下载后覆盖补丁）

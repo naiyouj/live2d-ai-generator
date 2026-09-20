@@ -1,0 +1,26 @@
+diff --git a/inference/scripts/inference_psd_quantized.py b/inference/scripts/inference_psd_quantized.py
+index 36c586a..0f421d3 100644
+--- a/inference/scripts/inference_psd_quantized.py
++++ b/inference/scripts/inference_psd_quantized.py
+@@ -287,8 +287,19 @@ def run_marigold(marigold_pipe, srcp, save_dir, seed, resolution_depth):
+         img_list_input = [smart_resize(img, resolution_depth) for img in img_list]
+ 
+     seed_everything(seed)
+-    pipe_out = marigold_pipe(color_map=None, img_list=img_list_input)
+-    depth_pred = pipe_out.depth_tensor
++    # img_list 含 20 个身体部位层 + 1 张全图，一次性推理时 attention 的显存需求
++    # 与 batch 成正比，8GB 显卡在 768 分辨率下会请求 31 GiB 而 OOM。
++    # 分批推理并按 batch 维拼接，结果与一次性推理等价。
++    # 可通过环境变量 L2D_DEPTH_BATCH 调整（默认 3）。
++    _depth_batch = max(1, int(os.environ.get("L2D_DEPTH_BATCH", "3")))
++    _chunks = []
++    for _i in range(0, len(img_list_input), _depth_batch):
++        _chunks.append(
++            marigold_pipe(
++                color_map=None, img_list=img_list_input[_i:_i + _depth_batch]
++            ).depth_tensor
++        )
++    depth_pred = torch.cat(_chunks, dim=0) if len(_chunks) > 1 else _chunks[0]
+     depth_pred = depth_pred.to(device='cpu', dtype=torch.float32).numpy()
+ 
+     # Resize depth back to source resolution if needed

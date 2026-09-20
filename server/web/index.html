@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live2D AI 生成器</title>
+<link rel="stylesheet" href="/static/app.css?v=8">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="logo"></span>
+    <div>
+      <h1>Live2D AI 生成器 <sup>v2</sup></h1>
+      <p class="sub">AI 生图 → 一张图 → 可动模型 · 全流程本地运行</p>
+    </div>
+  </div>
+  <div class="envchips" id="envChips"></div>
+  <div class="topActions">
+    <button class="btn ghost" id="btnEnv">环境自检</button>
+    <button class="btn ghost" id="btnSettings">设置</button>
+  </div>
+</header>
+
+<main class="layout">
+
+  <aside class="side">
+    <div class="panel">
+      <div class="panelHead"><span>新建任务</span></div>
+      <div class="panelBody">
+        <label class="field">
+          <span>任务名</span>
+          <input id="fName" placeholder="留空则用提示词前 30 字">
+        </label>
+        <label class="field">
+          <span>生图提示词</span>
+          <textarea id="fPrompt" rows="3"
+            placeholder="古风少女，青色汉服，长发及腰…&#10;注意：必须全身+正面+单人+A-pose+纯色背景"></textarea>
+        </label>
+        <label class="field">
+          <span>生图方式</span>
+          <select id="fGenMode">
+            <option value="upload">上传本地图片</option>
+            <option value="api">在线 / 本地 API</option>
+            <option value="comfyui">ComfyUI</option>
+          </select>
+        </label>
+        <label class="field hidden" id="fUploadWrap">
+          <span>选择立绘</span>
+          <input type="file" id="fUpload" accept="image/*">
+        </label>
+        <details class="adv">
+          <summary>高级参数</summary>
+          <label class="field"><span>预处理</span>
+            <select id="fPre">
+              <option value="crop">仅裁切居中</option>
+              <option value="rembg">去背景 + 裁切</option>
+            </select>
+          </label>
+          <label class="field"><span>分层精度</span>
+            <select id="fPrecision">
+              <option value="auto">自动（按显存）</option>
+              <option value="bf16">bf16</option>
+              <option value="nf4">NF4 量化</option>
+            </select>
+          </label>
+          <label class="field"><span>分层分辨率</span>
+            <select id="fRes">
+              <option value="768">768（快）</option>
+              <option value="1024" selected>1024</option>
+              <option value="1280">1280（慢）</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" id="fOffload"> 开启 group_offload（省显存）</label>
+        </details>
+        <button class="btn primary block" id="btnCreate">创建并运行</button>
+      </div>
+    </div>
+
+    <div class="panel grow">
+      <div class="panelHead"><span>任务列表</span><button class="mini" id="btnRefresh">刷新</button></div>
+      <div class="taskList" id="taskList"></div>
+    </div>
+  </aside>
+
+  <section class="stage">
+    <div class="pipeline" id="pipeline"></div>
+
+    <div class="detailWrap">
+      <div class="columns">
+        <div class="panel">
+          <div class="panelHead">
+            <span id="detailTitle">阶段详情</span>
+            <span class="spacer"></span>
+            <label class="mini filebtn">上传接管<input type="file" id="overFile" hidden></label>
+            <button class="mini" id="btnReset">重置</button>
+            <button class="mini" id="btnRunStage">从此步重跑</button>
+            <button class="mini" id="btnCancel" disabled>取消</button>
+            <button class="mini danger" id="btnDelete" disabled>删除</button>
+          </div>
+          <div class="panelBody" id="detail"></div>
+        </div>
+
+        <div class="panel previewPanel">
+          <div class="panelHead">
+            <span>模型预览</span>
+            <span class="spacer"></span>
+            <button class="mini" id="btnOpenModel">全屏</button>
+          </div>
+          <div class="canvasWrap">
+            <canvas id="l2d"></canvas>
+            <div class="emptyHint" id="previewHint">完成第 5 步后可在此驱动模型</div>
+          </div>
+          <div class="ctrlRow" id="ctrlRow" hidden>
+            <label>转头 X<input type="range" id="ax" min="-30" max="30" value="0" title="双击归零"></label>
+            <label>低头 Y<input type="range" id="ay" min="-30" max="30" value="0" title="双击归零"></label>
+            <button class="mini" id="btnIdle" title="剔除待机动作里的 Z 轴旋转后播放">待机</button>
+            <span class="spacer"></span>
+            <button class="mini" id="btnAnim" hidden>动画编辑</button>
+            <button class="mini" id="btnExport" hidden>导出模型包</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 编辑工作台：动画 / 图层 两个子页，切换显示，不再上下堆叠滚动 -->
+      <div class="panel workbench" id="workbench" hidden>
+        <div class="wbTabs">
+          <button class="wbTab active" data-tab="anim">动画编辑</button>
+          <button class="wbTab" data-tab="layers">图层管理</button>
+          <span class="hintInline" id="wbHint">拖骨骼摆姿势 → K 打帧 → ▶ 播放（Space 播放 / K 打帧）</span>
+        </div>
+
+        <div class="wbPage" id="wbPageAnim">
+          <div class="animBar">
+            <button class="btn primary" id="btnPlay">▶ 播放</button>
+            <label class="mini">时长 <input type="number" id="animDur" min="0.5" max="30" step="0.5" value="3"></label>
+            <label class="mini"><input type="checkbox" id="animLoop" checked> 循环</label>
+            <label class="mini animAutoKey" title="拖完骨骼自动在播放头处打帧">
+              <input type="checkbox" id="animAutoKey"> 自动打帧</label>
+            <button class="mini" id="btnKf" title="给选中骨骼的当前姿态打关键帧（快捷键 K）">K 打帧</button>
+            <button class="mini" id="btnKfAll" title="给所有有关键帧的骨骼打帧">K! 全部</button>
+            <button class="mini" id="btnKfClear" title="清掉选中骨骼在播放头处的帧">删帧</button>
+            <button class="mini danger" id="btnClearTracks" title="清空全部关键帧">清空</button>
+            <span class="spacer"></span>
+            <input type="text" id="animName" placeholder="动作名，如 nod、打招呼" maxlength="40">
+            <button class="btn primary" id="btnSaveMotion">保存动作</button>
+          </div>
+          <div class="animBody">
+            <div class="boneCol">
+              <div class="boneColHead">
+                <span>骨骼</span>
+                <span class="spacer"></span>
+                <button class="mini" id="btnAddBone" title="新增自定义骨骼：选锚点网格、绑参数">＋骨骼</button>
+              </div>
+              <div class="boneList" id="boneList"></div>
+              <div class="accSec">
+                <div class="accHead">
+                  <span>配件</span>
+                  <span class="spacer"></span>
+                  <label class="mini filebtn" title="上传 PNG 挂到骨骼上，可调跟随权重">＋图片
+                    <input type="file" id="accFile" accept="image/png,image/webp,image/jpeg" hidden></label>
+                </div>
+                <div class="accList" id="accList"></div>
+              </div>
+            </div>
+            <div class="dopeWrap" id="dopeWrap">
+              <div class="dopeHead">
+                <span class="animTime" id="animTime">0.00s / 3.0s</span>
+                <span class="spacer"></span>
+                <span class="hintInline">菱形：拖动改时间 · 单击换缓动 · 右键删除</span>
+              </div>
+              <div class="dopeGrid" id="dopeGrid">
+                <div class="dopeCorner">骨骼</div>
+                <div class="dopeRuler" id="dopeRuler"></div>
+                <div class="dopeNames" id="dopeNames"></div>
+                <div class="dopeBars" id="dopeBars"></div>
+                <i class="playhead" id="playhead"></i>
+              </div>
+              <div class="motionList" id="motionList"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wbPage" id="wbPageLayers" hidden>
+          <div class="layerBar">
+            <span class="hintInline">按部件分组 · 上 = 最前 · 拖动网格行排序 · 「✎ 图」进入图片编辑</span>
+            <span class="spacer"></span>
+            <button class="mini" id="btnLayerReset">还原排序</button>
+          </div>
+          <div class="layerGrid" id="layerList"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panelHead">
+          <span>运行日志</span>
+          <span class="spacer"></span>
+          <select id="logLevel" class="miniSelect">
+            <option value="all">全部</option>
+            <option value="error">仅错误</option>
+            <option value="cmd">仅命令</option>
+          </select>
+          <button class="mini" id="btnClearLog">清空</button>
+        </div>
+        <div class="logBox" id="logBox"></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="modalMask" id="modalMask" hidden>
+  <div class="modal" id="modalSet">
+    <div class="panelHead">
+      <span>设置</span><span class="spacer"></span>
+      <button class="mini" id="btnCloseSet">关闭</button>
+    </div>
+    <div class="panelBody modalBody" id="setBody"></div>
+    <div class="modalFoot">
+      <button class="btn" id="btnReload">重新加载</button>
+      <button class="btn primary" id="btnSaveSet">保存</button>
+    </div>
+  </div>
+
+  <div class="modal wide" id="modalEnv">
+    <div class="panelHead">
+      <span>环境自检</span><span class="spacer"></span>
+      <button class="mini" id="btnCloseEnv">关闭</button>
+    </div>
+    <div class="panelBody modalBody" id="envBody"></div>
+    <div class="modalFoot">
+      <button class="btn primary" id="btnFetchVendor">下载网页预览依赖</button>
+    </div>
+  </div>
+
+  <div class="modal" id="modalBone" hidden>
+    <div class="panelHead">
+      <span id="boneModalTitle">自定义骨骼</span><span class="spacer"></span>
+      <button class="mini" id="btnBoneClose">关闭</button>
+    </div>
+    <div class="panelBody modalBody" id="boneFormBody"></div>
+    <div class="modalFoot">
+      <button class="btn danger" id="btnBoneDelete" hidden>删除此骨骼</button>
+      <button class="btn primary" id="btnBoneOk">保存</button>
+    </div>
+  </div>
+
+  <div class="modal xl" id="modalTex" hidden>
+    <div class="panelHead">
+      <span id="texTitle">图片编辑</span>
+      <span class="spacer"></span>
+      <label class="mini filebtn" title="用本地图片整张替换（改 AI 没裁好的图）">替换整图
+        <input type="file" id="texReplace" accept="image/*" hidden></label>
+      <button class="mini" id="btnTexUndo" disabled>撤销</button>
+      <button class="mini" id="btnTexClose">关闭</button>
+    </div>
+    <div class="texTools">
+      <button class="mini ttool active" data-t="brush">橡皮擦</button>
+      <button class="mini ttool" data-t="lassoErase">圈选擦除</button>
+      <button class="mini ttool" data-t="lassoPeel">圈选剥离成配件</button>
+      <label class="mini">笔刷 <input type="range" id="texBrush" min="4" max="90" value="26" style="width:90px"></label>
+      <span class="texHint" id="texHint"></span>
+      <span class="spacer"></span>
+      <button class="btn primary" id="btnTexSave">保存贴图</button>
+    </div>
+    <div class="texCanvasWrap"><canvas id="texCanvas"></canvas></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="/static/app.js?v=13"></script>
+</body>
+</html>

@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# 本机环境与流水线产物（安装环境.bat 重建 / 流水线重新生成）
+.venv/
+logs/
+workspace/
+
+# 外部工具仓库本体（下载外部工具.bat 按 pinned 提交号下载并套补丁）
+tools/see-through/
+tools/image2live2d/
+
+# 网页预览依赖（下载外部工具.bat 或环境自检按钮下载）
+server/web/vendor/
+
+# 密钥 —— 绝对不能入库
+data/secrets.json
+
+# 备份与临时文件
+*.zip
+*.tmp
+_tmp_*
+_gh_*
